@@ -1,70 +1,87 @@
 # CopyRight
-## from licensed legal PDFs to structured metadata (research use)
 
----
+將原本分散的 PDF 解析腳本整理成可維運的 API 架構，支援「解析 → 寫入資料庫（MongoDB）」的實務流程。
 
-### 🍡 ​collection: index_todo 
+## 功能
 
-#### 🐦‍⬛​ demo collection: testing_writein
+- **Metadata 解析與寫入**：從指定頁面擷取 Lexis front-matter。
+- **Footnote 解析與寫入**：擷取腳註並自動回填對應 `No`。
+- **Opinion 解析與寫入**：擷取 Opinion 段落、頁碼區間與超連結。
+- **批次 Footnote 匯入**：掃描 `data/` 下所有 PDF。
 
-##### 🌸​ setting_index.ipynb  
-→ extract basic case index information  
-(getting No, page, pdf, Court, Date, and Title)
+## 專案結構
 
-- Remember to check the output in notebook and fix some entries (title) manually if needed.
+```text
+app/
+  main.py                    # FastAPI 入口
+  config.py                  # 環境參數設定
+  schemas.py                 # API request/response models
+  repository.py              # MongoDB 存取層
+  parsers/
+    footnote_parser.py
+    metadata_parser.py
+    opinion_parser.py
+  services/
+    ingest_service.py        # 解析+寫入整合
+```
 
-##### 🌸​ circuit_level.ipynb  
-→ derive Court Level / Circuit information for index_todo
+舊檔案 `footnote.py`、`lexis_metadata_extractor.py`、`opinion.py` 已改為 **legacy CLI wrapper**，內部改呼叫新 service。
 
-##### 🌸​ lexis_metadata_extractor.py  
-→ enrich index_todo with Lexis-style opinion front-matter metadata
+## 環境變數
 
-- Extracts structured metadata from Lexis-formatted PDFs:
-  - Core Terms
-  - Judges
-  - Opinion by
-  - Counsel
-  - Prior history
-  - Subsequent history
-- Designed to start from the opinion page (`page`) and scan forward
-- Used both for single-case testing and batch backfilling
-- Does not overwrite existing core index fields
+可用 `.env` 或系統環境變數：
 
-##### 🌸​ index_preprocess.py  
-→ post-extraction normalization and cleanup for index_todo
+- `MONGO_URI`（預設 `mongodb://localhost:27017`）
+- `MONGO_DB`（預設 `copyright`）
+- `DATA_DIR`（預設 `data`）
 
-- Removes Lexis footnote markers (e.g. `[*1]`, `[**12]`) from selected textual fields
-- Normalizes date-related fields (`Argued`, `Decided`, `Others`) into timezone-aware
-  datetime objects (Asia/Taipei, GMT+8)
-- Uses batch updates (`bulk_write`) and only modifies documents when values change
-- Designed to be re-runnable and schema-preserving (idempotent normalization)
+## 啟動 API
 
----
-### 🍡​ collection: judges_tidy 
+```bash
+uvicorn app.main:app --reload
+```
 
-##### 🌸judge.ipynb -> simple webcrawler of Ballopedia
+## API endpoints
 
-- Websites sometimes block web crawlers
-- name are written in different way we need to change the the format to meet the input
-- some names are not in ballopedia need, so we need to add them into the collection manually
-- some names are too short to be found directly. when the situation happens, find all the posible results from websites and save them into collection. We can match the other information of the profiles and the case.
----
-### 🍡​ collection: new_format_opinion
+### 1) 匯入 metadata
 
-#### 🐦‍⬛​ demo collection: opinion_testing
+`POST /api/metadata/ingest`
 
-##### 🌸​ opinion.py -> extracts Opinion sections from legal PDF files using font- and layout-based rules (detecting Opinion headers and body text across pages), aggregates associated hyperlinks, and stores each complete Opinion section into MongoDB with page range metadata for research use.
+```json
+{
+  "pdf_filename": "cp01.pdf",
+  "start_page": 44
+}
+```
 
----
+### 2) 匯入 footnotes
 
-### 🍡​ collection: RST_Preprocessed_SBS
+`POST /api/footnotes/ingest`
 
-##### 🌸​ link_classify.ipynb  → classify objects under "urls_dic" in RST_Preprocessed_SBS
+```json
+{
+  "pdf_filename": "cp01.pdf"
+}
+```
 
----
+### 3) 匯入 opinions
 
-### 🍡​ collection: case_urn
+`POST /api/opinions/ingest`
 
-##### 🌸​ buildup_case_urn.ipynb  → build "case_urn" collection by extracting and consolidating citation data from RST_Preprocessed_SBS 
+```json
+{
+  "pdf_filename": "cp01.pdf"
+}
+```
 
----
+### 4) 批次匯入 footnotes
+
+`POST /api/footnotes/ingest-all`
+
+## Legacy CLI 用法
+
+```bash
+python lexis_metadata_extractor.py --pdf cp01.pdf --start-page 44
+python opinion.py --pdf cp01.pdf
+python footnote.py
+```
