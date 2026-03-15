@@ -7,7 +7,7 @@ class Settings(BaseSettings):
 
     mongo_uri: str = Field(default='mongodb://localhost:27017', alias='MONGO_URI')
     mongo_db: str = Field(default='copyright', alias='MONGO_DB')
-    data_dir: str = Field(default='data', alias='DATA_DIR')
+    data_dir: str = Field(default='pdf_file', alias='DATA_DIR')
 
 
 settings = Settings()

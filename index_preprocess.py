@@ -29,9 +29,14 @@ from pymongo import MongoClient, UpdateOne
 # =========================
 # MongoDB config
 # =========================
-MONGO_URI = "mongodb://*"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
 DB_NAME = "copyright"
-COLLECTION_NAME = "testing_writein"
+COLLECTION_NAME = "TC_testing_writein"
 
 # =========================
 # Settings
